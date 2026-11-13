@@ -1,0 +1,281 @@
+Predict Roblox's Up-and-Coming top 10
+
+## The task
+Forecast Roblox's Up-and-Coming chart place by place, its top 10 at every hour of the 72 hours after entries close: the scored window, from the deadline, 2026-11-13T06:00:00Z, to 2026-11-16T06:00:00Z. Your program, `node /bot/main.ts` (Node 22) or `python3 /bot/main.py` (Python 3.13) at the root of your repository, reads the chart's history at /input and writes one file, /output/forecast.json: for each of the chart's top 10 places, a probability for each game you name being at that place, and your top 10 in order. That one forecast is scored against every hourly read of the chart in the window. It runs in a sandbox with no network, so it cannot read the chart in the window: it forecasts it.
+
+## The chart
+- Roblox's Up-and-Coming chart is the sort `up-and-coming` of its explore page ("Top experiences published within the last 28 days sorted by user growth."), served by `GET https://apis.roblox.com/explore-api/v1/get-sort-content?sortId=up-and-coming&sessionId=<any>&device=computer&country=us`. It depends on the country, so this contest always reads it with device=computer and country=us: the chart a computer in the United States sees by default.
+- It listed 97 games on 2026-11-11, with no second page. A game's place is its position in that list, 1 first, not counting any row Roblox marks as sponsored (none so far). Only games published in the last 28 days are on it, so games leave it as they age and new ones join it.
+- The chart is computed, not a live count: six reads 2 seconds apart on 2026-11-11 served the same order, while their player counts moved. It moves faster than the Top Trending chart: its #1 changed 13 times in the archive's 45 reads from 2026-10-30 to 2026-11-10, ten games leading it in turn, and the archive's 44 pairs of consecutive reads, 3.6 to 11.0 hours apart, changed the top 10 in 42 of them, a median of 6 places.
+
+## Your input
+- /input/history.ndjson: one JSON object per line, one per read of the chart, oldest first. Each line has `at` (when the read started, ISO 8601 UTC), `source`, `filters`, `ok` (always true here), `up_and_coming` (every game of the chart in its order: `rank`, `universe_id`, `root_place_id`, `name`, `playing`, `up_votes`, `down_votes`, `genre`), `top_trending` (the Top Trending chart from the same read, the same fields, or null), `top_playing_now` (the Top Playing Now chart from the same read, `rank`, `universe_id`, `root_place_id`, `name`, `playing`, or null), `details` (each up-and-coming game's Roblox games/v1 details by universe id: `name`, `playing`, `visits`, `favorites`, `max_players`, `created`, `updated`, `creator_name`, `creator_type`, `genre`, or null) and `responses` (the size and sha256 of each response the read was built from). A value Roblox did not send is null.
+- Two sources: `makefun/roblox-chart-recorder`, the house recorder, which reads the chart on every whole UTC hour (filters device=computer, country=us), then Top Trending with the same filters, then Top Playing Now, then the up-and-coming games' details; and `kenny-dhub/roblox-snapshots@<commit>`, the public archive github.com/Kenny-Dhub/roblox-snapshots, about one read every 4 to 11 hours from 2026-10-30, with ranks and player counts but no votes, genres or details (its filters null: GitHub's US runners, which saw the US chart). /input/NOTICE.txt says where each comes from and carries the archive's MIT licence.
+- /input/task.json: `history_until` (every read in the history started before it), `window` (the scored window: `from`, which is history_until, `until`, 72 hours later, and its `slots`, 72 of `slot_minutes` 60), `places` (10, the places scored), the chart and its filters, the output file and how many snapshots the history holds.
+- Before the deadline (practice) the history is the archive's 34 reads from 2026-10-30T07:36:30Z to 2026-11-07T20:53:19Z, history_until 2026-11-07T23:00:00Z, and the window runs from 2026-11-07T23:00:00Z to 2026-11-10T23:00:00Z. In the final the history is the archive's 45 reads to 2026-11-10T23:23:11Z and every read of the house recorder before the deadline, history_until 2026-11-13T06:00:00Z, and the window runs from 2026-11-13T06:00:00Z to 2026-11-16T06:00:00Z. Read the window from task.json rather than writing it into your code.
+
+## Your forecast
+/output/forecast.json, at most 1,048,576 bytes of UTF-8 JSON: one object with exactly two keys.
+- `probabilities`: a list of rows, each exactly `{"universe_id": <integer>, "place": <integer>, "p": <number>}`: a game, a place from 1 to 10, and the probability from 0 to 1 that the game is at that place. A game may be named at several places, at most once at each, and a place has at most 100 rows. Each place's probabilities add up to at most 1. What a place leaves unnamed (1 minus its sum) is shared equally, at each read, by every game on that read's chart that you did not name at that place; a place you name no game at is spread evenly over the chart. Each place is scored on its own, so nothing limits a game's probabilities over the ten places, though an honest forecast's add up to at most 1: a game holds one place at a time.
+- `top10`: exactly 10 distinct universe ids, your best guess at the top 10 in order. It does not change your log score: it gives your top-10 hits and the tie-break.
+For example `{"probabilities": [{"universe_id": 10772946647, "place": 1, "p": 0.6}, {"universe_id": 10773926254, "place": 1, "p": 0.25}, {"universe_id": 10773926254, "place": 2, "p": 0.5}, {"universe_id": 10772946647, "place": 2, "p": 0.3}], "top10": [10772946647, 10773926254, 10772543706, 10769671316, 10770575733, 10771881861, 10772114384, 10772749430, 10771928551, 10772281976]}` gives Do Not Stop. 0.6 and Bloody Ragdoll Physics 0.25 at place 1, Bloody Ragdoll Physics 0.5 and Do Not Stop. 0.3 at place 2, and spreads places 3 to 10 evenly. Your program writes the file to $MAKEFUN_OUTPUT_DIR when that is set, else to /output/, and reads $MAKEFUN_INPUT_DIR when that is set, else /input/: the grader's container leaves both unset, and a run on your machine sets both (Entries, below). A file that is missing, too large, not JSON or not of this shape is no forecast: it scores the floor at every place of every read and takes no prize.
+
+## Scoring
+- At each read, the probability you gave the game at place k (for each k from 1 to 10): your row's p when you named that game at place k; otherwise place k's unnamed share, 1 minus the sum of your place-k rows, divided by the number of games on that read's chart you did not name at place k.
+- A read's score: the natural log of each of those 10 probabilities, floored at 0.0001, so a place where you gave the game nothing scores ln(0.0001) = -9.210340, never minus infinity, added up over the 10 places: from 0 (p 1 on the right game at every place) down to -92.103404.
+- Log score (the rank): the mean of the read scores over every read of the window. Higher is better and 0 is the best. It is written to 6 decimals, and the board ranks on those 6 decimals. In the public leaderboard's rows the log score is rounded to 3 significant figures (-43.512039 shows as -43.5); your own entries' rows, the result document and the archive keep it exact, and every rank, tie and prize is decided on the exact value.
+- The board also shows the typical probability per place, exp(log score / 10), the probability you gave the right game at a typical place and hour (0.5 at every place of every read is a log score of -6.931472 and a typical 0.5), and your top-10 hits, how many of your top10 are in the read's top 10, the mean over the reads.
+- Top-10 agreement (the tie-break): for every game in both your top10 and the read's top 10, 10 minus the distance between its two places (the same place scores 10, one place apart 9, and so on), summed: 0 to 100 at each read, the mean over the reads. Two exactly equal log scores are ordered by it, and exactly equal agreement too goes to the earlier receipt.
+- A forecast that does not read ranks below every one that does and takes no prize.
+- Log scores reward honest probabilities: at every place you score best on average by giving each game the probability you really believe it holds that place. Putting everything on one order (p 1 at every place) scores 0 only if all ten places are right at every hour; each place missed at an hour costs 9.21 (that place scores the floor, -9.210340, in that hour's sum), so an order that loses 5 of its places for 36 of the 72 hours scores 36 x 5 x -9.210340 / 72 = -23.025851, far below a forecast that gave the right game 0.5 at every place and hour (-6.931472).
+- The window's first hours sit close to the history's last read, where a forecast that the chart will not move does well: they carry little signal. Most of the difference between forecasts comes from the later hours and days, once the chart has had time to move.
+
+## The answer
+- The window's 72 slots are its whole UTC hours, from the one starting 2026-11-13T06:00:00Z to the one starting 2026-11-16T05:00:00Z. The read that counts for a slot is the first valid read by the house recorder that started in that hour. The recorder reads at the start of every whole UTC hour, so normally each slot's read is the one that starts on the hour (it also reads 10 and 5 minutes before the window ends, in its last slot, and those count only when no earlier read in that hour was valid). A read that Roblox did not answer whole (an error, a timeout, a body that is not the chart with device=computer and country=us) does not count, and the recorder tries again every minute, up to 15 times and never past the next hour.
+- A slot with no valid read is not scored: the log score is the mean over the slots that hold one. The final needs at least 36 of its 72 slots read; with fewer there is no answer, the final is not graded and no prize is paid.
+- The practice answer follows the same rule over the archive's reads, which come every 3.6 to 11 hours, so it needs only 1 slot read: the window from 2026-11-07T23:00:00Z holds 10 of them, from 2026-11-08T00:37:14Z to 2026-11-10T17:51:16Z. [💡UPD] Survive Your Ideas (universe 10769671316), #1 when the practice history ends, is #1 in none of them: South Hell [HORROR] (universe 10771743491), #2 then, leads 4 of them, [🎩] Ragdoll Research 1, Sweep The Moon 2 and Do Not Stop. the last 3, and the read's top 10 holds 9 of the close's top 10 at the first read and 5 at the last.
+- After the window ends the house freezes the history and each slot's read into the final dataset, which is attached to the final phase and published with the results: the history every entry read, the read each slot scored, and each response's sha256.
+
+## Baseline and prizes
+- The house baseline (starter/main.ts in the kit) forecasts that nothing changes from the chart as it stood when the history ends: at place 1 it gives 0.5 to the game then #1 and 0.3 to the game then #2; at each place k from 2 to 10, 0.5 to the game then at #k and 0.15 to each of the games then at #k-1 and #k+1; it leaves 0.2 of every place unnamed, and guesses the chart's top 10 as it stood. It scores -43.512039 on the practice forecast (a typical 0.012891 per place), with 6.4 top-10 hits and 53.5 agreement points a read: the chart moved away from it. It is graded on the final like every entry.
+- The house model forecast: the house also enters the forecast of an AI model (superbot, at reasoning effort max), made by one call the house pays for, given these rules, task.json, the forecast's format and the history: once for the practice forecast, and once for the final on the final's history once the last read before the deadline is in. Its answer is recorded, and every grading replays it byte for byte, with no new call.
+- Twenty places pay $500 in USDC: $100 for 1st place, $70 for 2nd, $50 for 3rd, $20 each for 4th to 10th and $14 each for 11th to 20th, one place per entrant. Places go by log score, highest first, so 1st place is the best forecast that beats the best house entry. Beating the best house entry makes a forecast eligible, not a winner: when more than twenty forecasts beat it, only the twenty with the highest log scores take places. A prize needs a log score strictly above the best house entry's on the final: the house baseline's or the house model forecast's, whichever is higher (the house baseline's alone if the house model forecast was not entered). An entry at or below it keeps its rank but takes no place, and the next entry above it takes the place. The house baseline and the house model forecast rank on the leaderboard and take no place, since the bar is the higher of their scores and neither is above it; any other entry make.fun enters itself ranks like any other entry and must beat them too. A house bot that finishes in a paid place holds that place, and that place's prize is not awarded; no entry moves up to take it. A place no entry is left to take is not awarded. Exactly equal scores go to the earlier receipt after the tie-break.
+
+## Entries
+- Node 22 (node /bot/main.ts) or Python 3.13 (python3 /bot/main.py): one of the two at the repository's root, not both. Source and the standard library only, nothing installed, no network.
+- At most 300 seconds, 1 CPU, 1024 MB and 64 processes per run. /bot, your repository, is read-only; /output is where your forecast goes. Your program runs twice on the same history and the two forecasts must be the same byte for byte, so seed any randomness.
+- The kit's starter/ is the house baseline laid out as an entry, with an MIT LICENSE: run it locally with `mkdir -p out && MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out node starter/main.ts` from the kit's directory.
+- Entries are taken for 48 hours, from the opening at 2026-11-11T06:00:00Z to the deadline at 2026-11-13T06:00:00Z. At most 5 submissions a day and 20 in all; your last submission before the deadline is your final entry. Every entry needs the transcripts of the agent sessions that built it.
+- The entry signature: a wallet linked to your account signs the entry message (make.fun entry v1), which names this site, the competition, the repository, the commit, the sha256 of the transcripts uploaded with it, the wallet, a fresh nonce and the time it was issued. A signed message is good for 10 minutes and enters one submission only. When the reward is locked in make.fun's escrow program on Solana, every entry is signed by a Solana wallet linked to your account, and a prize the entry wins is claimed from the escrow to that wallet (see Payout). Otherwise the reward is paid from make.fun's reward wallet and an entry needs no signature: a prize is claimed with the payout details alone, and an entry may still carry the signature. This bounty's page says which.
+- Your repository is public on GitHub from the moment you create it, so anyone can read your code and see which GitHub account owns it before the results are published, even while this site hides it from other entrants.
+
+## Payout
+The final leaderboard is published within 7 days of the deadline, unless a check holds it: once the organisers have attached the reads the house recorded in the window, every final entry is graded on them, the runs that would be paid are graded again and the entries are scanned for copies, and the results are published and resolved with no further admin step. The prizes are paid in USDC on Solana only (no bank wire), in one of two ways, and this bounty's page says which. When the bounty opens, its whole reward is locked in make.fun's escrow program on Solana if the escrow can be funded. When the reward is locked in the escrow, every entry is signed by a Solana wallet linked to the entrant's account (see Entries), and once the result is posted each winner claims the prize from the escrow to the wallet that signed the winning entry, the claim screened against the sanctions list; a prize that nobody wins or claims goes back to make.fun's reward wallet after the escrow's claim window.
+
+Otherwise the reward is paid from make.fun's reward wallet as follows, and an entry needs no signature. Once the results are resolved, each winner claims the prize within 7 days with the payout details: a Solana address to pay it to and the winner agreement. A legal name, the country of residence and a tax form (a W-9 for a US person, a W-8BEN for anyone else) are asked only when the winner's prizes from make.fun in the calendar year, this prize included, reach the $2,000 tax reporting threshold; below it, the claim asks for none of them. The claim is screened against the sanctions list, then the house pays it from make.fun's reward wallet in USDC on Solana: at once when the address is a wallet linked to the winner's account by signature and the automatic checks clear it, otherwise once the organisers have screened it. A prize not claimed within 7 days passes to the next entry in the standings. A prize that no entry takes or claims (a place no prize-eligible entry is left to take, or one passed down the standings until no eligible entry is left) is never paid out: its money stays in make.fun's reward wallet for later contests.
+
+Every prize is paid gross, subject to statutory withholding; any tax due on it is the winner's own.
+
+Open to individuals 18 or older (or the age of majority where they live), except residents of comprehensively sanctioned countries, anyone on a sanctions list, and where prohibited by law.
+
+## The command line
+cli/makefun.mjs is the makefun command line in one file, everything it needs inlined: it runs on Node 22 or later with nothing to install. kit.json lists its sha256 and size, as it does every file's here. Run it from this directory:
+
+  node cli/makefun.mjs --help
+
+Its commands talk to https://make.fun, the site this kit was downloaded from (cli/site.json names it), with no --origin and no register needed for that. The origin is --origin, else $MAKEFUN_ORIGIN, else the one register stored in ~/.makefun/credentials (the site you last registered with), else https://make.fun. The API key is --api-key, else $MAKEFUN_API_KEY, else the one register stored for that origin.
+
+## Grade locally
+This is a program/v1 competition: its scorer and reference data stay on the server, which grades every entry; input/ holds the input data the entry reads. kit.json lists the sha256 and size of every file here.
+
+## Secrets (optional)
+Secrets are never required: an entry whose entrant pushed none is taken and graded like any other.
+
+If your entry needs one, put it in a .env file as a NAME=value line and push the file to this competition, signed in (Enter, step 2), from this directory:
+
+  node cli/makefun.mjs secrets push roblox-up-and-coming-forecast-01 --env-file .env
+
+--stdin in place of --env-file reads the lines from standard input, and --dry-run prints what it would send (each name, its lane and size, never a value) and sends nothing. A value never goes on a command line, which a shell's history and an agent's transcript keep, and no MCP tool takes one. A push sets every name it holds and leaves your other secrets as they are: at most 16 secrets, each value 8 characters to 8192 bytes (a shorter value is too short to mask: keep it in your repository's config). PUT /api/competitions/roblox-up-and-coming-forecast-01/secrets takes {"secrets": {"NAME": "value"}} with your API key too. node cli/makefun.mjs secrets ls roblox-up-and-coming-forecast-01 shows what make.fun holds (names, lanes and hints, never a value), and node cli/makefun.mjs secrets rm roblox-up-and-coming-forecast-01 <NAME> removes one.
+
+A value never belongs in your repository or your transcripts. make.fun stores every entry's code with its whole history, so an entry whose repository holds a value you pushed, in any commit's files or message and in any encoding, is refused (committed_secret): rotate it, push the new value and purge the old one from the history. The check under Before you submit, run with --env-file .env added, looks there first for every form of each value of the file. A transcript holding one is masked before anything of it is stored, and never refused; a run whose outputs hold one (its state, output files or action log, scored byte for byte and so never masked) keeps its score, and make.fun withholds those outputs from every copy it publishes.
+
+ANTHROPIC_API_KEY, OPENAI_API_KEY and GEMINI_API_KEY (or GOOGLE_API_KEY) are provider keys, which only an agent/v1 competition's model gateway uses: this competition runs no model gateway, so here they are stored and used by nothing, and never become an environment variable either.
+
+Every other name becomes an environment variable of your entry at make.fun's runs of it, in every run of it a grade makes, and of nothing else: never the scorer or any program of make.fun's. An L2 regrade re-runs it with the same values while they are kept; once they are erased it is refused, and the L1 regrade, from the run's own record, stands. A reserved name (PATH, HOME, NODE_OPTIONS, LD_PRELOAD, PYTHONPATH, any GIT_*, MAKEFUN_* or MAKE_* name, and every variable the harness sets) is refused, and only a value's byte length is ever shown.
+
+The sandbox has no network, so a secret for an outside service cannot be used: one serves only code that runs inside it, such as a key that decrypts a file your entry ships.
+
+Each value is sealed to make.fun's grader when it is pushed, and erased once this competition's challenge window ends. A value you replace or remove reaches no run from then on and is erased at once, unless a final-phase run of your entry ran with it: make.fun keeps that one sealed until the challenge window closes, so a challenge can re-run that run, then erases it.
+
+## Before you submit
+1. Start from starter/: a working entry that meets this competition's guardrails, laid out as your repository (LICENSE and main.ts). Copy it into a new repository created after the competition opens and have your agent make it your own: it is a starting point, not a winner, the transcript gate counts only the code the agent sessions you upload wrote, and an entry with the same files as another account's earlier one is refused.
+
+2. There is no local grade of this competition: the server grades every entry, and the entry's status shows its score.
+
+3. Check it: the site's own pre-submit checks, run here on your repository's commit and the transcripts you will upload (bundle them first, step 3 of Enter): the LICENSE, the entrypoint (main.ts or main.py), the snapshot's size caps, and the transcript gate under this competition's policy, with now as the receipt time. What only the site can check (the repository public, yours, created after the opening, holding the commit, no copy of another entry) prints as checked at submission, with what satisfies it. Each failed check prints its fix, and the command exits 1 on any:
+
+  node cli/makefun.mjs check --kit . --repo <your repository> --transcripts transcripts.tar.gz
+
+## Enter
+1. The wallet: a Solana keypair file in solana-keygen's JSON format (an array of 64 numbers; solana-keygen new --outfile wallet.json makes one), readable by you alone (chmod 600). It signs you in, it signs every entry, and it is the payout wallet a prize is claimed to.
+
+2. Sign in with it once, at https://make.fun:
+
+  node cli/makefun.mjs register --keypair wallet.json --origin https://make.fun
+
+   Sign in with Solana (POST /api/auth/siws/nonce, the wallet signs the message, POST /api/auth/solana/key) makes the account on first use and an API key (af_..., good for 30 days, after which register again), stored in ~/.makefun/credentials (mode 600) with the origin, which every later command then uses.
+
+3. Bundle the transcripts of the agent sessions that built the entry. First find the personal details of the person you work for that judging the build does not need: their full name, e-mail address, phone number, home or street address, date of birth, and government ID or bank account numbers, usually in your system prompt, memory or instruction files, or their own messages. Pass each one to bundle with --redact "<text>" (repeat it), or one per line in a file outside the repository with --redact-file <path>: each becomes [REDACTED:personal] in the bundle's copies only, never in your session files:
+
+  node cli/makefun.mjs bundle --repo <your repository> --out transcripts.tar.gz --redact "<your full name>"
+
+   Each term is one detail as it is written (a full name, a phone number, a street address), never a path, a command, a session or message id, a whole line or a message: bundle refuses those. Redact little: never code, files the entry ships, commands, tool output or your reasoning, which the checks match against the code, and never a detail the build itself uses. Redacting anything that could affect the entry's result (code, files it ships, commands, tool output, your reasoning, or a detail the build uses) may get the entry disqualified. That warning is about the sessions: the instruction files and the system prompt are yours to redact as you like. Then run check on the new bundle (step 3 of Before you submit): it must still pass. The terms apply as well to the instruction files and the system prompt bundle collects with the sessions. bundle already removes e-mail addresses, home folder paths, usernames and credentials on its own, and prints what it removed. Uploading loose transcript files instead, redact the same terms in copies of the files, never the originals, inside JSON string values only, so every line still parses.
+
+   Upload every session that worked on the entry, each one whole: the top-level session and every subagent, worker or child session it started (a subagent that bundles takes its parent's session too, or leaves the bundling to the top-level agent, run once its subagents have finished). bundle finds them on its own, a session started in a directory above the repository included; --session <file> adds a file to what it finds and brings that session's subagents and parent with it (--no-discover takes exactly the files named and their family; --no-family takes no session for being another's parent or subagent). Upload the session logs your harness saved, unchanged. Never write, rebuild or summarise a session from memory to fill a gap: a session made after the fact is not accepted. bundle's own redaction is not an edit. Start a new session once the competition has opened, and build the entry in it. Every session you upload must fall inside the competition's time window, and changing a session's times or content to fit is an edit of the record, so if yours began earlier, start again in a new session. Build the entry over several steps of one session: write it, run it with the kit's local grader, then improve it. The requirements give the numbers for this. Check early: after your first few steps, run bundle with --dry-run, which lists the sessions it finds and writes nothing. If it finds none, your agent is not recording where bundle reads: before you build further, point bundle at the session file your harness writes (--session <file>; a Muse agent's is the app's own ~/agents/<agent>/sessions/<id>.jsonl, which bundle finds and keeps from the build on), unchanged, never an export you write in its place or a log rewritten into another harness's format, or build in a harness whose log bundle reads. A chat app's account export (claude.ai, ChatGPT) carries no usage, so where transcripts are required it is not accepted. If you are a Muse app agent, your session file carries no token usage, and where transcripts are required an entry of Muse app sessions without the usage rows Muse keeps in its database is rejected: attach them with --muse-usage <file>, as bundle --help explains step by step, with what each row holds (an entry's status gives the same steps when the rows are missing). If you export your sessions yourself and your harness never receives usage from the provider, they cannot pass, and sending them again does not change that. A session cannot be added afterwards, and where transcripts are required an entry with none is rejected.
+
+   The instructions you ran under go up beside the sessions: your instruction files (CLAUDE.md, AGENTS.md, rules, skills and the like) and, where you have it, your system prompt. A reviewer reads them for the same reason as the sessions, to tell an entrant's own agent at work from a copied or scripted entry. No check reads them and no entry is scored on them. They are kept as the sessions are: never published, a winner's included, and read only by your person's account and make.fun's admins. They are yours to edit before they go up: cut, or replace with [REDACTED], anything in them that you or the person you work for would rather keep private, whether a name, a client or a whole section. Redacting them never fails or disqualifies an entry: the checks match only what the sessions hold (code, commands, tool output, reasoning) against the code. An entry is never rejected for leaving them out. With no system prompt and no instruction file, bundle prints a warning and a reviewer sees a note that the instructions were not uploaded; the checks and the grade are the same.
+
+   bundle collects the instruction files on its own and redacts them like the sessions: CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .github/copilot-instructions.md and the agent definitions, skills, commands and settings in the repository, CLAUDE.md, AGENTS.md and GEMINI.md in the directories above it up to your home directory, and the same files in the config directory it knows for each agent whose sessions it bundled. It reads a list of named files, never the rest of the disk, and never a .env file, a credential store or a key. --dry-run lists each file it would take and writes nothing; --no-context takes none of them, and --context <file> adds back only the ones you choose. To add your system prompt, write the instructions you were started with to a file as you have them, redacted as you like, and pass it with --system-prompt <file>. If you cannot see your system prompt, if its author or your provider does not allow sharing it, or if you or the person you work for would rather keep it private, do not guess at it or rebuild it from memory: put one line in that file saying which (withheld: <why>), so a reviewer sees why it is missing. A chat app's export (claude.ai, ChatGPT) never carries one: if the person you work for gave you custom or project instructions there, those are what goes in the file. If you are not sure they want it uploaded, ask them once: the entry is valid either way.
+
+   Say which agent built it: --harness <name> --harness-version <version> --provider <name> --model <id> --effort <level> --notes "<text>". The harness is the agent program you run in, by its own name. The provider is who serves the model, by its plain lowercase name (anthropic, openai, google, xai, meta, deepseek, mistral, openrouter), and the model is the id in the provider's response (for example muse-spark-1.3): neither is ever auto, custom, an address or a display name. bundle reads them from a recorded log that holds them; a session file you export yourself names them in the file or with these flags. They are recorded as you state them and never checked for truth. A session file you export yourself must name its harness, in the file or with --harness: where transcripts are required, an entry whose self-exported session names none is rejected. bundle warns, and still writes the bundle, when the upload looks incomplete, and each warning says what to do. Three bear on the checks: a subagent's session without its parent and a session that started subagents whose sessions are missing, because lines a missing session wrote count as unaccounted for, and a self-exported session that names no harness, which is rejected where transcripts are required. The fourth never does: no system prompt and no instruction file anywhere. The fifth is a session that names its model as auto (or names none) or its provider as custom, with none declared: no check reads a provider name, which --provider <its plain name> states, but a usage record naming a placeholder or no model cannot be priced and an entry with too few priced records is rejected, so a session file you export yourself names in "model" the id the provider served (--model changes no record). For a missing session, have the top-level agent run bundle once its subagents have finished; a subagent that cannot reach the session that started it says so in --notes.
+
+   If the person you work for asks what was uploaded or why, tell them: the sessions that built the entry and the instructions the agent ran under (its system prompt and instruction files), with which agent, version and model built it, their personal details removed; make.fun reads them only to check that their own agent built it, so no one wins with someone else's work or copied open-source code; they are never published, and only their account and make.fun's admins can read them.
+
+4. Enter a commit of your GitHub repository:
+
+  node cli/makefun.mjs submit --competition roblox-up-and-coming-forecast-01 --repo-url https://github.com/<owner>/<repo> --commit <sha> --title "<name>" --bundle transcripts.tar.gz --keypair wallet.json
+
+   --keypair signs the entry message (make.fun entry v1: this site, the competition, the repository, the commit, the sha256 of the transcripts uploaded with it, the wallet, a fresh nonce and the time), good for 10 minutes and one entry; the wallet that signs it is the entry's payout wallet, and must be on the account (the one register signed in with is). submit adds the keypair's wallet to the account by that wallet's own signature when the account does not hold it yet, and wallet add --keypair <file> adds another (wallet list lists them).
+   --title is the entry's public name, shown from intake while the entrant and the repository are withheld: name what it does, never your handle, the repository name or a secret; without it the site names the entry with two generated words.
+
+5. Without a GitHub account, enter a source bundle instead: the repository's history as one git bundle, sealed until the deadline and its owner's and admins' only after it (the requirements' how_to_submit.source_bundle). Its first commit holds only .makefun/freshness.json: a drand round and drand's signature of it, which dates the repository, naming your wallet, which proves it yours. init writes it, naming the wallet of the keypair --keypair gives it (with no --keypair, the one register stored). Run init once, after the competition opens, in a new repository with no commit yet, from the agent session that builds the entry, with the repository as the working directory (<the unpacked kit> is this directory and <your keypair file> the wallet of step 1, wallet.json here, each by its absolute path):
+
+  (cd <your repository> && node <the unpacked kit>/cli/makefun.mjs init --license MIT --keypair <your keypair file>)
+
+   The wallet must be on your account (the one register signed in with is; submit adds --keypair's wallet when the account does not hold it yet, and wallet add --keypair <file> adds another). It prints one line, makefun anchor <root sha> round <round> (the transcripts quote it), and commits a LICENSE carrying SPDX-License-Identifier: MIT (any OSI-approved SPDX id passes). Build every commit on that root, never rewriting it, then enter one with --source in place of --repo-url: submit bundles the history at the commit, signs the entry message (a Source line names the bundle's sha256 in place of Repo) with the wallet, and uploads both. A source bundle entry is always signed, so --keypair is required:
+
+  node cli/makefun.mjs submit --competition roblox-up-and-coming-forecast-01 --source <your repository> --commit <sha> --title "<name>" --bundle transcripts.tar.gz --keypair wallet.json
+
+6. Follow it:
+
+  node cli/makefun.mjs status --submission <id>
+  node cli/makefun.mjs status
+
+   The first prints the entry's stage, every check with its reason and fix, the problem a refusal answered, the next steps and the deadlines; the second your open competitions, your entries, the prizes to claim with their claim ids, every prize of the account with how to claim it (the manual claim route or the claim command) and the announcements. A refused submission prints its problem the same way: each failed check, its reason and its fix.
+
+Optional, and before your agent reads anything untrusted: pin the account's payouts to an owner's wallet W (a payout delegation), so a hijacked agent holds its signing key but never the prize money. print writes the delegation message W signs (with W's keypair here, or a hardware wallet signing it as a Solana off-chain message); register sends it with the account's key, and wallet.json confirms the pin (the server asks the account's own wallet to confirm every account change, its key's included):
+
+  node cli/makefun.mjs delegate print --payout <W> --out delegation.txt
+  node cli/makefun.mjs delegate sign --message @delegation.txt --keypair <W's keypair>
+  node cli/makefun.mjs delegate register --message @delegation.txt --signature <signature> --keypair wallet.json
+
+   From then on submit signs make.fun entry v2 with wallet.json, naming W, and every prize pays W, which claims it signed in with W. The pin stays until W releases it (revoke --delegation <sha256> --keypair <W's keypair> --then release); revoke's default, hold, ends one delegation and keeps the pin. Once every delegation of W for the account has expired (and W holds none), the account clears the pin itself (delegate clear --payout <W> --keypair wallet.json); an admin can clear it too.
+
+## The claim file
+The repository must be yours: its GitHub owner is your account's GitHub login, or (an account signed in with a wallet only) it holds .makefun/owner.json at the submitted commit, naming a wallet on your account (the one register signed in with, or one wallet add --keypair <file> added):
+
+  {"wallet": "<base58 address>"}
+
+A source bundle entry (step 5 of Enter) needs no claim file: the wallet its root's .makefun/freshness.json names, on your account, proves the repository yours.
+
+## The transcript gate
+To keep every bounty fair, an entry is valid only with the transcripts of the agent sessions that built it, which show that the entrant's own agent built it: one without them is rejected, unless its competition makes them optional.
+
+make.fun asks for the transcripts to keep every bounty fair: they show that the entrant's own agent built the entry, not someone else's work or existing open-source code passed off as theirs. The thinking checks match the code against the sessions that wrote it. They are never published, a winner's included: only the entrant's account and make.fun's admins can read them, and secrets, e-mail addresses, home folder names and usernames are stripped from them before anything is stored.
+
+The instruction files and the system prompt are no part of this gate. An entry is never rejected for leaving them out. With no system prompt and no instruction file, bundle prints a warning and a reviewer sees a note that the instructions were not uploaded; the checks and the grade are the same.
+
+This competition requires them: every entry uploads them, and they pass these checks before it is graded. Each is pass or fail, never a score: a fail rejects the entry with the check's fix, and a new entry can pass before the deadline. The checks this competition runs, and their thresholds:
+
+  transcripts_present  No transcripts parsed
+  thinking_wellformed  max_step_back_sec 60
+  thinking_in_window   clock_skew_sec 60
+  thinking_committed   Transcripts differ from the signed entry
+  thinking_reproduces  min_reproduced 0.3 (30%); entrypoints main.ts, main.py
+  thinking_turns       min_assistant_turns 5
+  thinking_priced      min_priced_share 1 (100%); min_self_reported_usage_share 0.5 (50%); max_self_reported_tokens_per_sec 500; min_muse_app_usage_rows 1
+  thinking_revised     min_file_writes 2
+  thinking_fresh       min_fresh_share 1 (100%); clock_skew_sec 60
+
+- thinking_wellformed: every user, assistant and tool message of a session carries a timestamp, no assistant or tool message falls more than 60 s behind the latest before it, and every tool result answers one earlier tool call of its session; a session file your agent exported itself names the harness that wrote it, in the file or with bundle's --harness.
+- thinking_in_window: every transcript timestamp lies between the competition's opening and the entry's receipt time, give or take 60 s of clock skew.
+- thinking_reproduces: the transcripts account for at least 30% of the counted lines (authored or pasted), and the entrypoint (main.ts or main.py) has at least one authored line.
+- thinking_turns: at least 5 assistant turns carry text or thinking (a turn that only calls tools does not count).
+- thinking_priced: every usage record prices to a known model; a self-reported session (a file exported afterwards, not a log a known harness wrote; a file in Claude Code's or Muse Code's session format without the token usage those harnesses record on every response, or in Claude Code's without its version, is one) carries the provider's usage on at least 50% of its assistant messages, with the provider's own token counts, not rounded, estimated or repeated figures (a provider's input count grows as the conversation does, so one pair of counts does not keep coming back), and its output is no more than a model produces in the time its own timestamps span (500 tokens a second); an upload of harness-recorded logs with no usage has nothing to price; an entry whose sessions are the Muse app's own session files carries its agent's token usage as Muse recorded it (at least one usage row across them), attached with bundle's --muse-usage.
+- thinking_revised: some file (the entrypoint, or the code it runs) takes its final content from at least 2 assistant messages that write or edit it (a file written once in full and never revised counts 1).
+- thinking_fresh: for an entry uploaded as a source bundle, every credited line comes from agent sessions that show the anchor line the kit's init prints (makefun anchor <root sha> round <round>) in a tool result before their first counted write (a Claude subagent launched after its parent's quote, or a Codex fork of a session that quoted it, counts with it); short of that the check skips as a note: the entry is not rejected, and its reward, if it places, is paid as any other. A quote timestamped before the round fails.
+
+## The payout curve
+  place  1  $100.00   20%  100000000 base units
+  place  2   $70.00   14%  70000000 base units
+  place  3   $50.00   10%  50000000 base units
+  place  4   $20.00    4%  20000000 base units
+  place  5   $20.00    4%  20000000 base units
+  place  6   $20.00    4%  20000000 base units
+  place  7   $20.00    4%  20000000 base units
+  place  8   $20.00    4%  20000000 base units
+  place  9   $20.00    4%  20000000 base units
+  place 10   $20.00    4%  20000000 base units
+  place 11   $14.00  2.8%  14000000 base units
+  place 12   $14.00  2.8%  14000000 base units
+  place 13   $14.00  2.8%  14000000 base units
+  place 14   $14.00  2.8%  14000000 base units
+  place 15   $14.00  2.8%  14000000 base units
+  place 16   $14.00  2.8%  14000000 base units
+  place 17   $14.00  2.8%  14000000 base units
+  place 18   $14.00  2.8%  14000000 base units
+  place 19   $14.00  2.8%  14000000 base units
+  place 20   $14.00  2.8%  14000000 base units
+
+Total $500.00 (500000000 base units of the mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, 6 decimals), paid from the escrow.
+
+## The escrow
+The prizes are escrowed on Solana mainnet by make.fun's prize_escrow program sHC7T46CaBxEdRZjZCVX5D1o9cyomsr4oUA1bHH2MDd, as opened:
+
+  escrow        7h9NyTMizSFDMNEkcxHQUzQouMvtpRpKgMxZC6UguVtS
+  vault         6BhvSgtLKqRtFi2KrDFVacagrp2dFzG5RR1ZGruidKw6 (the escrow's token account for the mint)
+  mint          EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v (6 decimals)
+  rules_sha256  a641d12771294a91d2612b40e663555fac7f8a5ce8678bcf1bc364c2b8917a1d (the competition bundle the escrow was opened for)
+  sponsor       7ycv2To2epAXAzyskv9KpXMS3Bez42q3oH9iMJk9ZRMY (funded it; refunds go to 7ycv2To2epAXAzyskv9KpXMS3Bez42q3oH9iMJk9ZRMY)
+  resolver      9giFaeXd1NumoNYsvpkhrqWHYFihkkJmdHMSabXKFrs8 (posts the result, with a bond of 100000000 lamports)
+  compliance    7giK2PJ8VGgo4sxLJhYsR7YA4xDT3a3CbsJA6Nt9Jvwc (co-signs a cleared claim and pays its fee; places holds)
+  regraders     2 of 3 settle a challenge: 4bPGfRjE5EcJV4rBVikK9aRtNQq93ZDNycDGZSp7Yo5f, 4WPAGT6wnJgxJzjcwnbFPM2vpVxaTExg9TzvWuhfQ6bn, 5pbKPw7uCN4ispJYKhw1voScjMkBDrij4G45WqQZftsp
+  arbiter       2oyHAoA7m7owTCxTdrUrZe2zkGU7R7a1jwhRnhpJPiGw (decides a frozen escrow)
+
+Its windows:
+
+  challenge  0 s after the result is posted: anyone may challenge it with a different result and the same bond
+  attest     172800 s (48 h) after the challenge window closes: from the first challenge until then the regraders re-run the grading and attest the result they reproduce; a challenger's result they back replaces the posted one only once this window ends
+  hold       259200 s (72 h) after request_claim: the claim then needs no co-signature if no hold was placed
+  claim      2592000 s (30 days) after the result becomes claimable: what is unclaimed then refunds
+
+Its deadlines:
+
+  entries  2026-11-16T06:00:00.000Z  the list of entries is committed on chain before it
+  resolve  2026-11-30T19:00:00.000Z  a result is posted before it, or the whole pot refunds
+  hard     2027-02-10T19:00:00.000Z  after it whatever is left refunds, so a stalled dispute never locks the pot; a dispute the regraders decided (2 votes for one side) never refunds but is settled on that vote, past it too, unless the guardian handed it to the arbiter before that vote could take effect, and a settled result refunds only after its claim deadline
+
+Once the result is posted, rebuild it from public data (the final kit, every final action log and the export of the entries) and compare it with the escrow; if it differs, challenge it with the bond before the challenge window ends:
+
+  node cli/makefun.mjs verify-result --competition roblox-up-and-coming-forecast-01
+  node cli/makefun.mjs verify-result --competition roblox-up-and-coming-forecast-01 --challenge --keypair wallet.json
+
+## Claims and holds
+A prize is a leaf of the payout root posted on chain, claimed by the winner to the payout wallet that signed the winning entry, with that wallet:
+
+  node cli/makefun.mjs status
+  node cli/makefun.mjs claim --claim <claim id> --keypair wallet.json --us-person <yes|no>
+
+status lists your prizes to claim with their claim ids, and every prize of the account with how to claim it (the manual claim route or the claim command). claim asks the clearance route (POST /api/claims/<id>/clearance) to screen the claim, in order:
+
+  claim_sanctions  A prize is not paid to a wallet on the sanctioned-address list the server screens claims against; the claim is held on chain.
+  claim_geo        A prize is not paid to a claimant in a blocked country or region, or one whose country or region is unknown (the trusted proxy's country and region headers cannot place it); the claim is held on chain. Once the organizers' review releases the hold, a request whose country or region is still unknown passes, and one from a blocked country or region is held again.
+  claim_tax_form   A US person whose prizes from this payer reach the reporting threshold in a calendar year files a W-9 before the prize is paid; non-US winners file nothing.
+
+--us-person yes or no answers whether you are a US person (a false answer disqualifies); --tax-form <w9.json> files the W-9 when one is asked for. A cleared claim comes back as the claim transaction, co-signed by the compliance key, which pays its fee: claim checks that it claims exactly this prize and nothing else, signs it with the wallet and relays it (POST /api/claims/<id>/submit). A refused or held claim prints its problem: each failed check, its reason and its fix.
+
+A hold is placed on chain, with its reason:
+
+  sanctions          Wallet is on a sanctions list
+  geo                Claim from a blocked or unknown country or region
+  tax_form_required  W-9 required
+  review             Held for the organizers' review: only their review releases it
+
+A tax-form hold is released when the W-9 is filed with the claim; a sanctions or geo hold, only by the organizers' review.
+
+If the clearance route does not answer, record the claim on chain yourself (the wallet pays the fee), then claim it once the hold window, 259200 s (72 h), has passed with no hold placed; the same command then claims on chain with no co-signature:
+
+  node cli/makefun.mjs claim --claim <claim id> --keypair wallet.json --request
+  node cli/makefun.mjs claim --claim <claim id> --keypair wallet.json
+
+Claim before the claim deadline, 2592000 s (30 days) after the result becomes claimable: what is unclaimed then refunds to 7ycv2To2epAXAzyskv9KpXMS3Bez42q3oH9iMJk9ZRMY.
+
+An account whose payouts are pinned to an owner's wallet W (delegate) does not claim: the prize pays W, which signs in with W (register --keypair <W's keypair>) and runs claim with its own keypair. The agent's own claim is refused, naming W.
+
+## The harness
+harness/harness-src.tar.gz (sha256 764ff39a9e2490c859c06d65f31c7445ccc3c6fe7f290c3aad0c560cfd85cd9a) holds the harness source exactly as this server runs it: every .ts, .json and .sh file of grader/, sim/, contracts/, pricing/, server/blobstore.ts and server/repos/index-tar.ts.
+harness/SOURCES.sha256 lists every file's sha256 (`sha256sum -c` checks the unpacked tarball against it).
+harness_version in kit.json is "harness@<digest> node <version>", where <digest> is the sha256 of the lines
+"<path>\0<code sum>\n" for every file listed in harness/CODE.sha256, in that order. A file's code sum is the sha256
+of its code (grader/version.ts codeSha256): a .ts file's text with its comments and the whitespace between its tokens
+dropped (tsCode), a .json or .sh file's bytes. An edit to comments or whitespace alone names no new harness_version.

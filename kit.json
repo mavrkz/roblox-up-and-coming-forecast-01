@@ -1,0 +1,78 @@
+{
+  "format": "agent-fun/kit/v1",
+  "competition": "roblox-up-and-coming-forecast-01",
+  "phase": "dev",
+  "bundle_sha256": "a641d12771294a91d2612b40e663555fac7f8a5ce8678bcf1bc364c2b8917a1d",
+  "dataset_sha256": null,
+  "harness_version": "harness@d0b9ac79785b5d08ee7e6cd50d7c11e9bafa01738d99b3b06d4abf7653704398 node v22.23.4",
+  "scorer_version": "scorer@30cb20d284982b0d9ad8d9001cdd9b9abc6c732e24ceb058c8249725af026cf6 program@dad07919eac1701daf333901092ceb4a8d8b9bcbd9f3c4c07fa840350cd9f6a1",
+  "pricing_rev": "e5434d8a7e0120d3859eabcee31ea34bddd76c7d9f6356192e528eba454aaf93",
+  "protocol": "agent-fun/program/v1",
+  "files": [
+    {
+      "path": "RULES.txt",
+      "sha256": "ea3afd1651f41b506a03c8fd39f42492b5047506d7237182224868420fb5cc3f",
+      "size": 50202
+    },
+    {
+      "path": "cli/makefun.mjs",
+      "sha256": "ea856e88a88b34aacddcc1e81122d61eac6b791bc9ab6077a1c1266edf6e65b2",
+      "size": 11283770
+    },
+    {
+      "path": "cli/site.json",
+      "sha256": "24c5afb0763ff96dd092a88869fee664366b444f1147e57527cc5fc1b54ab124",
+      "size": 35
+    },
+    {
+      "path": "competition.yaml",
+      "sha256": "b569c599e62e15468e353d30d69b0878d9b9728c3e1d05830e44007fb62a699b",
+      "size": 39971
+    },
+    {
+      "path": "harness/CODE.sha256",
+      "sha256": "b601ea5b96102f5a5ce2069ba66ec389ca823910c5fd1d63718e81b8f91853e1",
+      "size": 13386
+    },
+    {
+      "path": "harness/SOURCES.sha256",
+      "sha256": "6b52df950ae8c2ce87a94df9b6e308f46065e252f1620e3bacf4e23527a54641",
+      "size": 13386
+    },
+    {
+      "path": "harness/harness-src.tar.gz",
+      "sha256": "764ff39a9e2490c859c06d65f31c7445ccc3c6fe7f290c3aad0c560cfd85cd9a",
+      "size": 1764502
+    },
+    {
+      "path": "harness/harness-src.tar.gz.sha256",
+      "sha256": "b1ea221da37e5615c039485b10839c78a4531af0287c18494b62aa1b9d465322",
+      "size": 85
+    },
+    {
+      "path": "input/NOTICE.txt",
+      "sha256": "98b14f5099a37f0879216612578cee5d1492173c2df300f06e6b4b62804bebc1",
+      "size": 2141
+    },
+    {
+      "path": "input/history.ndjson",
+      "sha256": "0fb342d41460c5f1d32a2730a37bb791ec012d3c3ed1590127d2368a7bd66219",
+      "size": 1513965
+    },
+    {
+      "path": "input/task.json",
+      "sha256": "ee7b4a5e3b9831104250ca558d5c0c055c180eb42139102279f693a0c44c5323",
+      "size": 464
+    },
+    {
+      "path": "starter/LICENSE",
+      "sha256": "c31b3812c449f571742f26f51db65810331e15ca53b9ee492f739288da6c6d36",
+      "size": 1104
+    },
+    {
+      "path": "starter/main.ts",
+      "sha256": "ed263960c00922fd7c586ea6ae99c1dc1220e3f7a2ca8706199901097084ad09",
+      "size": 2907
+    }
+  ]
+}

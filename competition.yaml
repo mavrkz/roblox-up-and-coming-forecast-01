@@ -1,0 +1,303 @@
+# Roblox Up-and-Coming forecast 01: forecast Roblox's Up-and-Coming chart place by place, its top 10 at every hour of the
+# 72 hours after entries close. Validated by server/competitions/load.ts against contracts/competition.ts; seeded by
+# `npm run db:seed`. tests/unit/comp-roblox-up-and-coming-forecast-01.test.ts holds the bundle, its rules' quotes and its
+# grading end to end. The owner's ask of 2026-11-11: "another version of the roblox top charts one but instead it's for
+# the up and coming chart section and it runs for 72h after it closes and is for $500 total - it can be open for 48h
+# total as well": roblox-trending-forecast-01's twin on another chart, its format, scoring, gate, table and baseline
+# design kept, its window three times as long. It follows the forecast-bundle template grader/forecast/ranked.ts states
+# (.cosmos/rules/contest-design.mdc).
+#
+# The chart (read live on 2026-11-11T03:17Z and 03:30Z, collector/roblox/chart.ts): GET
+# https://apis.roblox.com/explore-api/v1/get-sorts lists the explore page's sorts, Up-and-Coming among them (id
+# Up_And_Coming_V6, sortId up-and-coming, gameSetTargetId 692, "Top experiences published within the last 28 days sorted
+# by user growth."), and get-sort-content?sortId=up-and-coming&sessionId=<any> serves it: 97 games, no next page, no
+# sponsored row, each with its universeId, rootPlaceId, name, playerCount, votes and genre. It is filtered as Top
+# Trending is (a request naming no filter got device=computer,age=all,country=us and the same order; country=all served
+# another, Build a Bridge #3), so every read names device=computer and country=us (chart.ts UP_AND_COMING). Six reads 2 s
+# apart served one order, their player counts differing in 31 of the 97 games: the order is computed, the counts live,
+# so one read is the chart. It moves faster than Top Trending: in the public archive's 45 reads its #1 changed 13 times
+# among 10 games, and its 44 pairs of consecutive reads, 3.6 to 11.0 hours apart, changed its top 10 in 42 (a median of
+# 6 places; Top Trending's 30 pairs changed in 27, a median of 5).
+#
+# Format: a program/v1 forecast on data recorded after the deadline, as roblox-trending-forecast-01's (harness.final_dataset:
+# contracts/competition.ts, contracts/program-dataset.ts): its input is the chart's history up to the deadline, and its
+# reference the scored window's reads (collector/roblox/freeze.ts, forecastSpecOf('up-and-coming', 72):
+# UP_AND_COMING_ANSWER_SCHEMA), the 72 whole UTC hours after the deadline, each hour's read the first valid
+# house-recorder read that started in it, at least 36 of the 72 read or no answer. It is frozen by `collector/roblox/cli.ts
+# freeze --chart up-and-coming --window-hours 72` from the house recorder's snapshots (collector/roblox/record.ts,
+# deploy/k8s/components/roblox-chart-up-and-coming, a second recorder beside the trending one, which freezes it too once
+# the window ends into datasets/roblox-up-and-coming-forecast-01-final). The automation's lock step registers that freeze
+# sealed and attaches it to the final phase itself once it lands (server/competitions/lifecycle/auto.ts
+# frozenFinalStage: phases[final] names no dataset, so it looks under <slug>-final); `admin-dataset --sealed --attach
+# roblox-up-and-coming-forecast-01:final` is the override. An Up-and-Coming read's line (chart.ts ChartSnapshot) holds
+# the chart's rows under up_and_coming, the Top Trending chart of the same read under top_trending as context, then Top
+# Playing Now and the up-and-coming games' details. The dev phase grades on this directory's own sealed practice instance
+# (input/, reference/), built by `node collector/roblox/cli.ts practice --chart up-and-coming --window-hours 72 --archive
+# competitions/roblox-up-and-coming-forecast-01/archive/roblox-snapshots.ndjson --history-until 2026-11-07T23:00:00Z
+# --competition roblox-up-and-coming-forecast-01 --out <dir>` from archive/roblox-snapshots.ndjson: 45 reads of the
+# chart, 2026-10-30T07:36:30Z to 2026-11-10T23:23:11Z, converted by `cli.ts archive --chart up-and-coming` from the
+# public MIT-licensed archive https://github.com/Kenny-Dhub/roblox-snapshots (data/discover/latest.json at each of its
+# commits, its explore:up-and-coming source; the trending archive's commit wherever two commits carried one read), its
+# licence carried in input/NOTICE.txt. The practice history ends at 2026-11-07T23:00:00Z (34 reads, [💡UPD] Survive Your
+# Ideas #1, South Hell [HORROR] #2) and its window is the 72 hours after it, to 2026-11-10T23:00:00Z, the latest a
+# 72-hour window the archive's reads hold whole: 10 reads in it, Survive Your Ideas #1 in none (South Hell in 4, Sweep
+# The Moon in 2, Do Not Stop. in the last 3, [🎩] Ragdoll Research in 1), the close's top 10 holding 9 of the window's
+# first read's top 10 and 5 of its last. The archive reads every 3.6 to 11 hours, so the practice answer needs 1 slot
+# read (its min_slots), the final's 36. The final's history is the archive's 45 reads and every recorder read before the
+# deadline.
+#
+# Dates (the owner's, 2026-11-11): entries open 2026-11-11T06:00:00Z for 48 hours, to the deadline
+# 2026-11-13T06:00:00Z; the scored window is the 72 hours after it, to 2026-11-16T06:00:00Z, and has no key of its own
+# (the freeze derives it from the deadline and --window-hours: the recorder's --deadline is this deadline). The final
+# phase starts as the window ends (the recorder's --target, deadline + 72 h) and runs to the recorder's --until,
+# 2026-11-16T19:00:00Z, 13 hours, in which the freeze lands and is attached. The owner re-timed the launch on 2026-11-11
+# ("first one starting at 10:00pm MST", 2026-11-11T05:00:00Z, the openings 30 minutes apart, this contest third, on the
+# whole hour): every date moved 4 hours earlier, from an opening at 2026-11-11T10:00:00Z, but the final phase's end,
+# kept at the recording's --until, so the final phase grew from 9 hours to 13. A re-date moves opens_at, the deadline, both
+# phases and the dates the rules, the description, the summary and the resolution quote, all by the same offset, and the
+# recorder's three args with them, but for the final phase's end: a resume never shortens a recording
+# (collector/roblox/record.ts), so --until never moves earlier than the recording's own. The comp test derives its dates
+# from opens_at and the deadline. Since its escrow is funded at open (below), its bytes do not change once a site seeds
+# it open and public.
+#
+# No model provider: an entry is a program, Node 22 or Python 3.13, run in the sandbox with no network, reading
+# /input and writing /output/forecast.json, a place-by-game probability matrix and a top-10 guess. The scorer
+# (scorer/score.ts; scorer/forecast.ts, roblox-trending-forecast-01's thin wrapper over scorer/ranked.ts but for the
+# chart's rows, the 72 slots and the answer's schema; ranked.ts grader/forecast/ranked.ts byte for byte; score.ts the
+# trending's but for its header; node22 stdlib) gives the rank column, the log score: the mean over the window's reads of
+# the sum over the top 10 places of ln max(P, 0.0001), P the probability the forecast gave the game actually at that
+# place in that read (its own row, else the place's unnamed share over that read's chart), from 0 down to -92.103404.
+# Beside it the typical probability per place, exp(log score / 10), the mean top-10 hits, and the tie-break, the mean
+# top-10 agreement. The house baseline (baseline/main.ts, the kit's starter/ byte for byte; the trending's but reading
+# up_and_coming) is persistence on the chart as the history ends: at place 1, 0.5 on the #1 and 0.3 on the #2; at place
+# k from 2 to 10, 0.5 on the #k and 0.15 on each of #k-1 and #k+1; the chart's top 10 as its guess. On the practice
+# instance it scores -43.512039 (a typical 0.012891 per place), with 6.4 top-10 hits and 53.5 agreement points a read:
+# the chart moved away from it.
+#
+# The prize gate (prize_requires_beating_baseline): a program/v1 entry beats the gate on its rank value alone, strictly
+# (server/payouts/baseline.ts), the gate being the best of the phase's ranked baseline entries: the persistence baseline
+# and the house model one-shot (grader/house-forecast.ts, entered by scripts/competitions/house-forecast.ts), both the
+# house's entries and flagged baseline. The house model is superbot at reasoning_effort max (.cosmos/rules/house-models.mdc:
+# the house model, at max where depth decides the outcome), which the house forecast's CLI dials as it stands (--model
+# superbot --reasoning-effort max); the rules name it.
+#
+# Prizes: the release's twenty-place table, $100 / $70 / $50 / $20 x7 / $14 x10 = $500, roblox-trending-forecast-01's.
+# Full automation (lifecycle true, payouts auto): at the deadline the automation job waits at step lock for the final
+# dataset, which its own look attaches once the recorder's freeze lands after the window ends, and only if none is
+# attached by the final phase's end (2026-11-16T19:00:00Z) does it hold and page; once it is attached the job locks the
+# final, grades every final entry on it, regrades the would-be winners, scans for copies and publishes and resolves with
+# no admin. Its escrow is funded at open (automation.escrow: at_open, the owner's 2026-11-10 rule for every public
+# platform contest, .cosmos/rules/contest-design.mdc; server/competitions/load.ts escrowAtOpenIssues takes it: placement
+# prizes, lifecycle true, a final phase with an end starting 72 hours after the deadline, far past the commit window):
+# the worker moves the whole $500 from make.fun's reward wallet into the competition's escrow on Solana when it opens,
+# and the rules' Entries and Payout and the criteria's and announcement's payout lines say both outcomes in the btc-race
+# release template's words (server/releases/templates/btc-race.ts), as cutest-dog-01's do: a signed entry and a claim
+# from the escrow once the result is posted (after the final phase's end, which the escrow's post_result waits for), or,
+# when the escrow could not be funded, autopay from make.fun's reward wallet; the bounty's page says which. No challenge
+# window is named.
+version: 1
+
+competition:
+  slug: roblox-up-and-coming-forecast-01
+  title: Predict Roblox's Up-and-Coming top 10
+  summary: "Write a program that reads the history of Roblox's Up-and-Coming chart and forecasts its top 10, a probability for each game at each place, for every hour of the 72 hours after entries close (2026-11-13 06:00 UTC to 2026-11-16 06:00 UTC), for the highest log score over those hourly charts: 1st place is the best forecast, and a forecast must also beat our house forecasts to take any place; the highest log score wins $100, 2nd place $70, 3rd place $50, 4th to 10th place $20 each and 11th to 20th place $14 each."
+  demand: Roblox studios, analysts and trend trackers who want a forecaster that says which new games are about to climb the Up-and-Coming chart, and how sure it is of each place, before it happens.
+  category: Forecasting
+  skills: [Forecasting, Data analysis, TypeScript, Python]
+  status: open
+  visibility: public
+  sponsor: make-fun
+  reward_usd: 500
+  opens_at: "2026-11-11T06:00:00Z"
+  deadline: "2026-11-13T06:00:00Z"
+  description: |-
+    Roblox's Up-and-Coming chart lists the games published in the last 28 days whose players grow fastest, and its order moves several times a day as new games climb it and older ones age out. We want a forecaster that reads the chart's history and says, with honest probabilities, which games will hold each of its top 10 places over the next three days.
+
+    ## Context
+    Your entry is a program that reads hourly snapshots of the chart, each game's place, name and player count, and writes one forecast: for each of the top 10 places, a probability for each game it names being at that place, and its guess at the top 10 in order. It runs offline in the sandbox, with no network: everything it knows is in the history it is given, and nothing calls a model.
+
+    Entries are open for 48 hours, from 2026-11-11 06:00 UTC to the deadline, 2026-11-13 06:00 UTC. Before the deadline every entry is scored on a practice forecast from a public archive of the chart, and its score shows as it lands. After the deadline the house reads the chart every hour for 72 hours, from 2026-11-13 06:00 UTC to 2026-11-16 06:00 UTC, and every final entry runs once more on the whole history up to the deadline and is scored on each of those hourly charts.
+
+    The score is the log score: at each hourly chart, the natural log of the probability you gave the game actually at each of the top 10 places, added up over the places and averaged over the hours, so confident right calls score close to 0 and confident wrong ones far below. Ties are broken by how well your top 10 matches the real ones. A prize needs a higher score than the best house entry: the house baseline, which bets that the chart will not move, and a forecast by a house AI model. Once the organisers have attached the reads the house recorded, everything runs by itself, with no further admin step unless a check holds it, and each winner claims the prize in USDC on Solana: from make.fun's escrow program when the reward is locked there, otherwise from make.fun's reward wallet, as this bounty's page says.
+
+    ## Deliverables
+    - A public GitHub repository owned by your own GitHub account, created after the competition opens, under an OSI-approved license, with main.ts (Node 22) or main.py (Python 3.13) in the repository root that writes /output/forecast.json
+    - The AI coding-agent transcripts of the sessions that built it (Claude Code, Codex, Cursor and others), uploaded with each submission
+
+    ## Requirements
+    - Standard library plus source you vendor into the repository: nothing is installed before the program runs, and it has no network
+    - Read the history in /input; two runs on the same history must write the same forecast
+    - At most 300 seconds, 1 CPU and 1024 MB per run
+    - At most 5 submissions a day and 20 in all; your last submission before the deadline is your final entry
+  rules: |-
+    ## The task
+    Forecast Roblox's Up-and-Coming chart place by place, its top 10 at every hour of the 72 hours after entries close: the scored window, from the deadline, 2026-11-13T06:00:00Z, to 2026-11-16T06:00:00Z. Your program, `node /bot/main.ts` (Node 22) or `python3 /bot/main.py` (Python 3.13) at the root of your repository, reads the chart's history at /input and writes one file, /output/forecast.json: for each of the chart's top 10 places, a probability for each game you name being at that place, and your top 10 in order. That one forecast is scored against every hourly read of the chart in the window. It runs in a sandbox with no network, so it cannot read the chart in the window: it forecasts it.
+
+    ## The chart
+    - Roblox's Up-and-Coming chart is the sort `up-and-coming` of its explore page ("Top experiences published within the last 28 days sorted by user growth."), served by `GET https://apis.roblox.com/explore-api/v1/get-sort-content?sortId=up-and-coming&sessionId=<any>&device=computer&country=us`. It depends on the country, so this contest always reads it with device=computer and country=us: the chart a computer in the United States sees by default.
+    - It listed 97 games on 2026-11-11, with no second page. A game's place is its position in that list, 1 first, not counting any row Roblox marks as sponsored (none so far). Only games published in the last 28 days are on it, so games leave it as they age and new ones join it.
+    - The chart is computed, not a live count: six reads 2 seconds apart on 2026-11-11 served the same order, while their player counts moved. It moves faster than the Top Trending chart: its #1 changed 13 times in the archive's 45 reads from 2026-10-30 to 2026-11-10, ten games leading it in turn, and the archive's 44 pairs of consecutive reads, 3.6 to 11.0 hours apart, changed the top 10 in 42 of them, a median of 6 places.
+
+    ## Your input
+    - /input/history.ndjson: one JSON object per line, one per read of the chart, oldest first. Each line has `at` (when the read started, ISO 8601 UTC), `source`, `filters`, `ok` (always true here), `up_and_coming` (every game of the chart in its order: `rank`, `universe_id`, `root_place_id`, `name`, `playing`, `up_votes`, `down_votes`, `genre`), `top_trending` (the Top Trending chart from the same read, the same fields, or null), `top_playing_now` (the Top Playing Now chart from the same read, `rank`, `universe_id`, `root_place_id`, `name`, `playing`, or null), `details` (each up-and-coming game's Roblox games/v1 details by universe id: `name`, `playing`, `visits`, `favorites`, `max_players`, `created`, `updated`, `creator_name`, `creator_type`, `genre`, or null) and `responses` (the size and sha256 of each response the read was built from). A value Roblox did not send is null.
+    - Two sources: `makefun/roblox-chart-recorder`, the house recorder, which reads the chart on every whole UTC hour (filters device=computer, country=us), then Top Trending with the same filters, then Top Playing Now, then the up-and-coming games' details; and `kenny-dhub/roblox-snapshots@<commit>`, the public archive github.com/Kenny-Dhub/roblox-snapshots, about one read every 4 to 11 hours from 2026-10-30, with ranks and player counts but no votes, genres or details (its filters null: GitHub's US runners, which saw the US chart). /input/NOTICE.txt says where each comes from and carries the archive's MIT licence.
+    - /input/task.json: `history_until` (every read in the history started before it), `window` (the scored window: `from`, which is history_until, `until`, 72 hours later, and its `slots`, 72 of `slot_minutes` 60), `places` (10, the places scored), the chart and its filters, the output file and how many snapshots the history holds.
+    - Before the deadline (practice) the history is the archive's 34 reads from 2026-10-30T07:36:30Z to 2026-11-07T20:53:19Z, history_until 2026-11-07T23:00:00Z, and the window runs from 2026-11-07T23:00:00Z to 2026-11-10T23:00:00Z. In the final the history is the archive's 45 reads to 2026-11-10T23:23:11Z and every read of the house recorder before the deadline, history_until 2026-11-13T06:00:00Z, and the window runs from 2026-11-13T06:00:00Z to 2026-11-16T06:00:00Z. Read the window from task.json rather than writing it into your code.
+
+    ## Your forecast
+    /output/forecast.json, at most 1,048,576 bytes of UTF-8 JSON: one object with exactly two keys.
+    - `probabilities`: a list of rows, each exactly `{"universe_id": <integer>, "place": <integer>, "p": <number>}`: a game, a place from 1 to 10, and the probability from 0 to 1 that the game is at that place. A game may be named at several places, at most once at each, and a place has at most 100 rows. Each place's probabilities add up to at most 1. What a place leaves unnamed (1 minus its sum) is shared equally, at each read, by every game on that read's chart that you did not name at that place; a place you name no game at is spread evenly over the chart. Each place is scored on its own, so nothing limits a game's probabilities over the ten places, though an honest forecast's add up to at most 1: a game holds one place at a time.
+    - `top10`: exactly 10 distinct universe ids, your best guess at the top 10 in order. It does not change your log score: it gives your top-10 hits and the tie-break.
+    For example `{"probabilities": [{"universe_id": 10772946647, "place": 1, "p": 0.6}, {"universe_id": 10773926254, "place": 1, "p": 0.25}, {"universe_id": 10773926254, "place": 2, "p": 0.5}, {"universe_id": 10772946647, "place": 2, "p": 0.3}], "top10": [10772946647, 10773926254, 10772543706, 10769671316, 10770575733, 10771881861, 10772114384, 10772749430, 10771928551, 10772281976]}` gives Do Not Stop. 0.6 and Bloody Ragdoll Physics 0.25 at place 1, Bloody Ragdoll Physics 0.5 and Do Not Stop. 0.3 at place 2, and spreads places 3 to 10 evenly. Your program writes the file to $MAKEFUN_OUTPUT_DIR when that is set, else to /output/, and reads $MAKEFUN_INPUT_DIR when that is set, else /input/: the grader's container leaves both unset, and a run on your machine sets both (Entries, below). A file that is missing, too large, not JSON or not of this shape is no forecast: it scores the floor at every place of every read and takes no prize.
+
+    ## Scoring
+    - At each read, the probability you gave the game at place k (for each k from 1 to 10): your row's p when you named that game at place k; otherwise place k's unnamed share, 1 minus the sum of your place-k rows, divided by the number of games on that read's chart you did not name at place k.
+    - A read's score: the natural log of each of those 10 probabilities, floored at 0.0001, so a place where you gave the game nothing scores ln(0.0001) = -9.210340, never minus infinity, added up over the 10 places: from 0 (p 1 on the right game at every place) down to -92.103404.
+    - Log score (the rank): the mean of the read scores over every read of the window. Higher is better and 0 is the best. It is written to 6 decimals, and the board ranks on those 6 decimals. In the public leaderboard's rows the log score is rounded to 3 significant figures (-43.512039 shows as -43.5); your own entries' rows, the result document and the archive keep it exact, and every rank, tie and prize is decided on the exact value.
+    - The board also shows the typical probability per place, exp(log score / 10), the probability you gave the right game at a typical place and hour (0.5 at every place of every read is a log score of -6.931472 and a typical 0.5), and your top-10 hits, how many of your top10 are in the read's top 10, the mean over the reads.
+    - Top-10 agreement (the tie-break): for every game in both your top10 and the read's top 10, 10 minus the distance between its two places (the same place scores 10, one place apart 9, and so on), summed: 0 to 100 at each read, the mean over the reads. Two exactly equal log scores are ordered by it, and exactly equal agreement too goes to the earlier receipt.
+    - A forecast that does not read ranks below every one that does and takes no prize.
+    - Log scores reward honest probabilities: at every place you score best on average by giving each game the probability you really believe it holds that place. Putting everything on one order (p 1 at every place) scores 0 only if all ten places are right at every hour; each place missed at an hour costs 9.21 (that place scores the floor, -9.210340, in that hour's sum), so an order that loses 5 of its places for 36 of the 72 hours scores 36 x 5 x -9.210340 / 72 = -23.025851, far below a forecast that gave the right game 0.5 at every place and hour (-6.931472).
+    - The window's first hours sit close to the history's last read, where a forecast that the chart will not move does well: they carry little signal. Most of the difference between forecasts comes from the later hours and days, once the chart has had time to move.
+
+    ## The answer
+    - The window's 72 slots are its whole UTC hours, from the one starting 2026-11-13T06:00:00Z to the one starting 2026-11-16T05:00:00Z. The read that counts for a slot is the first valid read by the house recorder that started in that hour. The recorder reads at the start of every whole UTC hour, so normally each slot's read is the one that starts on the hour (it also reads 10 and 5 minutes before the window ends, in its last slot, and those count only when no earlier read in that hour was valid). A read that Roblox did not answer whole (an error, a timeout, a body that is not the chart with device=computer and country=us) does not count, and the recorder tries again every minute, up to 15 times and never past the next hour.
+    - A slot with no valid read is not scored: the log score is the mean over the slots that hold one. The final needs at least 36 of its 72 slots read; with fewer there is no answer, the final is not graded and no prize is paid.
+    - The practice answer follows the same rule over the archive's reads, which come every 3.6 to 11 hours, so it needs only 1 slot read: the window from 2026-11-07T23:00:00Z holds 10 of them, from 2026-11-08T00:37:14Z to 2026-11-10T17:51:16Z. [💡UPD] Survive Your Ideas (universe 10769671316), #1 when the practice history ends, is #1 in none of them: South Hell [HORROR] (universe 10771743491), #2 then, leads 4 of them, [🎩] Ragdoll Research 1, Sweep The Moon 2 and Do Not Stop. the last 3, and the read's top 10 holds 9 of the close's top 10 at the first read and 5 at the last.
+    - After the window ends the house freezes the history and each slot's read into the final dataset, which is attached to the final phase and published with the results: the history every entry read, the read each slot scored, and each response's sha256.
+
+    ## Baseline and prizes
+    - The house baseline (starter/main.ts in the kit) forecasts that nothing changes from the chart as it stood when the history ends: at place 1 it gives 0.5 to the game then #1 and 0.3 to the game then #2; at each place k from 2 to 10, 0.5 to the game then at #k and 0.15 to each of the games then at #k-1 and #k+1; it leaves 0.2 of every place unnamed, and guesses the chart's top 10 as it stood. It scores -43.512039 on the practice forecast (a typical 0.012891 per place), with 6.4 top-10 hits and 53.5 agreement points a read: the chart moved away from it. It is graded on the final like every entry.
+    - The house model forecast: the house also enters the forecast of an AI model (superbot, at reasoning effort max), made by one call the house pays for, given these rules, task.json, the forecast's format and the history: once for the practice forecast, and once for the final on the final's history once the last read before the deadline is in. Its answer is recorded, and every grading replays it byte for byte, with no new call.
+    - Twenty places pay $500 in USDC: $100 for 1st place, $70 for 2nd, $50 for 3rd, $20 each for 4th to 10th and $14 each for 11th to 20th, one place per entrant. Places go by log score, highest first, so 1st place is the best forecast that beats the best house entry. Beating the best house entry makes a forecast eligible, not a winner: when more than twenty forecasts beat it, only the twenty with the highest log scores take places. A prize needs a log score strictly above the best house entry's on the final: the house baseline's or the house model forecast's, whichever is higher (the house baseline's alone if the house model forecast was not entered). An entry at or below it keeps its rank but takes no place, and the next entry above it takes the place. The house baseline and the house model forecast rank on the leaderboard and take no place, since the bar is the higher of their scores and neither is above it; any other entry make.fun enters itself ranks like any other entry and must beat them too. A house bot that finishes in a paid place holds that place, and that place's prize is not awarded; no entry moves up to take it. A place no entry is left to take is not awarded. Exactly equal scores go to the earlier receipt after the tie-break.
+
+    ## Entries
+    - Node 22 (node /bot/main.ts) or Python 3.13 (python3 /bot/main.py): one of the two at the repository's root, not both. Source and the standard library only, nothing installed, no network.
+    - At most 300 seconds, 1 CPU, 1024 MB and 64 processes per run. /bot, your repository, is read-only; /output is where your forecast goes. Your program runs twice on the same history and the two forecasts must be the same byte for byte, so seed any randomness.
+    - The kit's starter/ is the house baseline laid out as an entry, with an MIT LICENSE: run it locally with `mkdir -p out && MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out node starter/main.ts` from the kit's directory.
+    - Entries are taken for 48 hours, from the opening at 2026-11-11T06:00:00Z to the deadline at 2026-11-13T06:00:00Z. At most 5 submissions a day and 20 in all; your last submission before the deadline is your final entry. Every entry needs the transcripts of the agent sessions that built it.
+    - The entry signature: a wallet linked to your account signs the entry message (make.fun entry v1), which names this site, the competition, the repository, the commit, the sha256 of the transcripts uploaded with it, the wallet, a fresh nonce and the time it was issued. A signed message is good for 10 minutes and enters one submission only. When the reward is locked in make.fun's escrow program on Solana, every entry is signed by a Solana wallet linked to your account, and a prize the entry wins is claimed from the escrow to that wallet (see Payout). Otherwise the reward is paid from make.fun's reward wallet and an entry needs no signature: a prize is claimed with the payout details alone, and an entry may still carry the signature. This bounty's page says which.
+    - Your repository is public on GitHub from the moment you create it, so anyone can read your code and see which GitHub account owns it before the results are published, even while this site hides it from other entrants.
+
+    ## Payout
+    The final leaderboard is published within 7 days of the deadline, unless a check holds it: once the organisers have attached the reads the house recorded in the window, every final entry is graded on them, the runs that would be paid are graded again and the entries are scanned for copies, and the results are published and resolved with no further admin step. The prizes are paid in USDC on Solana only (no bank wire), in one of two ways, and this bounty's page says which. When the bounty opens, its whole reward is locked in make.fun's escrow program on Solana if the escrow can be funded. When the reward is locked in the escrow, every entry is signed by a Solana wallet linked to the entrant's account (see Entries), and once the result is posted each winner claims the prize from the escrow to the wallet that signed the winning entry, the claim screened against the sanctions list; a prize that nobody wins or claims goes back to make.fun's reward wallet after the escrow's claim window.
+
+    Otherwise the reward is paid from make.fun's reward wallet as follows, and an entry needs no signature. Once the results are resolved, each winner claims the prize within 7 days with the payout details: a Solana address to pay it to and the winner agreement. A legal name, the country of residence and a tax form (a W-9 for a US person, a W-8BEN for anyone else) are asked only when the winner's prizes from make.fun in the calendar year, this prize included, reach the $2,000 tax reporting threshold; below it, the claim asks for none of them. The claim is screened against the sanctions list, then the house pays it from make.fun's reward wallet in USDC on Solana: at once when the address is a wallet linked to the winner's account by signature and the automatic checks clear it, otherwise once the organisers have screened it. A prize not claimed within 7 days passes to the next entry in the standings. A prize that no entry takes or claims (a place no prize-eligible entry is left to take, or one passed down the standings until no eligible entry is left) is never paid out: its money stays in make.fun's reward wallet for later contests.
+
+    Every prize is paid gross, subject to statutory withholding; any tax due on it is the winner's own.
+
+    Open to individuals 18 or older (or the age of majority where they live), except residents of comprehensively sanctioned countries, anyone on a sanctions list, and where prohibited by law.
+  resolution:
+    method: automated
+    summary: "Every final entry forecasts the top 10 of Roblox's Up-and-Coming chart (device computer, country US), a probability for each game at each place, for every hour from 2026-11-13T06:00:00Z to 2026-11-16T06:00:00Z, from the chart's history to the deadline, and ranks by its log score over the house recorder's hourly reads, highest first: 1st place goes to the best forecast. Beating the best house entry only qualifies a forecast; the 20 highest-scoring forecasts that beat it take the 20 places, one per entrant, and a paid place a house bot holds is not awarded. The highest log score wins $100, twenty places paying $500 in all."
+    criteria:
+      - "Harness: program/v1; the entry runs offline on the history (input/) and writes /output/forecast.json, twice on the same history with the outputs compared, and the sealed scorer scores it against every hourly read of the window"
+      - "Answer: the window's 72 whole UTC hours from 2026-11-13T06:00:00Z to 2026-11-16T06:00:00Z, each hour's read the first valid house-recorder read of the chart that started in it; an hour with none is not scored, and with fewer than 36 of the 72 read there is no answer and no prize"
+      - "Rank: the mean over the reads of the sum over the top 10 places of ln of the probability the forecast gave the game actually at that place (its own row, else the place's unnamed share over that read's chart), floored at 0.0001, to 6 decimals; ties by the mean top-10 agreement (10 minus the place distance per shared game, 0 to 100 a read), then the earlier receipt"
+      - "Prizes: $100 for 1st place, $70 for 2nd, $50 for 3rd, $20 each for 4th to 10th and $14 each for 11th to 20th, one place per entrant, in USDC on Solana; a paid place a house bot holds is not awarded, and no entry moves up to take it"
+      - "Beat the house: a prize needs a log score strictly above the best house entry's on the final, the house persistence baseline's or the house model forecast's; an entry that does not beat it keeps its rank and takes no place, and a place no entry is left to take is not awarded"
+      - "Payout: in USDC on Solana only, and the bounty's page says which way: when the reward is locked in make.fun's escrow program on Solana, every entry is signed by a Solana wallet linked to the entrant's account and each winner claims the prize from the escrow to that wallet once the result is posted, a prize nobody wins or claims going back to make.fun's reward wallet after the claim window; otherwise an entry needs no signature, each winner claims within 7 days (a legal name, country and tax form only once the winner's prizes from make.fun reach $2,000 in the calendar year), the claim is screened against the sanctions list and paid from make.fun's reward wallet, at once to a wallet linked by signature when the automatic checks clear it, an unclaimed prize passes to the next entry in the standings, and a prize nobody takes or claims stays in make.fun's reward wallet for later contests"
+      - "Reproducible: the final dataset (the history and each hour's read) is published with the results, so anyone can run and score every final entry again"
+    source: Roblox's public explore and games APIs, read hourly by the house recorder, and the MIT-licensed public archive github.com/Kenny-Dhub/roblox-snapshots
+    verifier: make.fun grader runs every final entry twice on the frozen final dataset and scores it with the sealed scorer; the results are published and resolved automatically once the final grades, the regrades of the would-be winners and the scan for copies are done
+    tie_break: Equal log scores go to the higher mean top-10 agreement, then to the earlier receipt
+    announce: Final leaderboard within 7 days of the deadline unless a check holds it; in USDC on Solana, winners claim from make.fun's escrow program once the result is posted when the reward is locked there, otherwise within 7 days from make.fun's reward wallet
+    metric:
+      name: Log score
+      unit: nats
+      better: higher
+
+harness:
+  kind: program/v1
+  runtimes: [node22, python3.13]
+  input_data: input
+  scorer:
+    runtime: node22
+    entrypoint: scorer/score.ts
+    reference_data: reference
+  scorer_sha256: dad07919eac1701daf333901092ceb4a8d8b9bcbd9f3c4c07fa840350cd9f6a1
+  input_sha256: 8611c96a4e651c1b85ce6bbf2198b46ad03eaa09880f40a6ff563edcf398bd75
+  reference_sha256: 9a2562a052d7689aa91cc2b316b74556485d7ec173ee0fe2c440a75da14ee699
+  gate: valid
+  final_dataset: true
+
+phases:
+  - key: dev
+    title: Practice forecast
+    description: Every entry forecasts the practice window, the 72 hours from 2026-11-07T23:00:00Z, from the public archive's history before it, and is scored on the archive's 10 reads in it; its score shows as it lands.
+    starts_at: "2026-11-11T06:00:00Z"
+    ends_at: "2026-11-13T06:00:00Z"
+    scores: live
+  - key: final
+    title: The next three days' charts
+    description: Every final entry forecasts the top 10 for every hour from 2026-11-13T06:00:00Z to 2026-11-16T06:00:00Z from the history to the deadline, and is scored on the house recorder's hourly reads in that window; scores appear with the results.
+    starts_at: "2026-11-16T06:00:00Z"
+    ends_at: "2026-11-16T19:00:00Z"
+    scores: after_finalize
+
+# The log score ranks (6 decimals, 4 shown), rounded to 3 significant figures in public rows (the catalogue rounds
+# every paid rank column, tests/unit/catalogue.test.ts; the rules say so); the typical probability per place is
+# exp(log score / 10); the top-10 hits and agreement are means over the reads, 1 decimal shown; the agreement breaks
+# exact ties (tie_break_index); valid is the gate (harness.gate): an entry whose forecast does not read ranks below
+# every one that does.
+leaderboard:
+  title: Results
+  primary_index: 0
+  tie_break_index: 3
+  columns:
+    - {key: log_score, title: Log score, index: 0, sorting: desc, precision: 4, significant_figures: 3}
+    - {key: p_place, title: Typical probability per place, index: 1, sorting: desc, precision: 4}
+    - {key: top10_hits, title: Top-10 hits, index: 2, sorting: desc, precision: 1}
+    - {key: agreement, title: Top-10 agreement, index: 3, sorting: desc, precision: 1}
+    - {key: valid, title: Valid forecast, index: 4, sorting: desc, precision: 0}
+
+submission_rule:
+  rule: Force_Last
+  max_per_day: 5
+  max_total: 20
+  transcripts_required: true
+  strategy_note_required: false
+  license: osi
+  repo_created_after_open: true
+  house_only: false
+
+prizes:
+  - {kind: placement, place: 1, amount_usd: 100, title: 1st place}
+  - {kind: placement, place: 2, amount_usd: 70, title: 2nd place}
+  - {kind: placement, place: 3, amount_usd: 50, title: 3rd place}
+  - {kind: placement, place: 4, amount_usd: 20, title: 4th place}
+  - {kind: placement, place: 5, amount_usd: 20, title: 5th place}
+  - {kind: placement, place: 6, amount_usd: 20, title: 6th place}
+  - {kind: placement, place: 7, amount_usd: 20, title: 7th place}
+  - {kind: placement, place: 8, amount_usd: 20, title: 8th place}
+  - {kind: placement, place: 9, amount_usd: 20, title: 9th place}
+  - {kind: placement, place: 10, amount_usd: 20, title: 10th place}
+  - {kind: placement, place: 11, amount_usd: 14, title: 11th place}
+  - {kind: placement, place: 12, amount_usd: 14, title: 12th place}
+  - {kind: placement, place: 13, amount_usd: 14, title: 13th place}
+  - {kind: placement, place: 14, amount_usd: 14, title: 14th place}
+  - {kind: placement, place: 15, amount_usd: 14, title: 15th place}
+  - {kind: placement, place: 16, amount_usd: 14, title: 16th place}
+  - {kind: placement, place: 17, amount_usd: 14, title: 17th place}
+  - {kind: placement, place: 18, amount_usd: 14, title: 18th place}
+  - {kind: placement, place: 19, amount_usd: 14, title: 19th place}
+  - {kind: placement, place: 20, amount_usd: 14, title: 20th place}
+
+limits:
+  cpus: 1
+  memory_mb: 1024
+  pids: 64
+  wall_budget_sec: 300
+
+min_authored_coverage: 0.8
+
+prize_requires_beating_baseline: true
+
+# A house entry that beats the gate holds the place it finishes in, unpaid, and no entry moves up (the gate's two
+# baselines never beat the better of them, so neither holds one); the rules say so.
+house_holds_places: true
+
+automation:
+  lifecycle: true
+  payouts: auto
+  escrow: at_open
